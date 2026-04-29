@@ -1,0 +1,9 @@
+[project]
+name = "hull-mesh-generation"
+version = "0.0.0"
+description = "Hull mesh generation code for the naval simulator"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "capytaine>=2.3.1",
+]
