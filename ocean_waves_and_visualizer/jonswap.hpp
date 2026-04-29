@@ -26,8 +26,6 @@ namespace jonswap_detail
     return v;
   }
 
-  // JONSWAP spectral density at each frequency (Hz → energy/Hz).
-  // Includes the 2π^-4 factor to stay consistent with the angular-frequency form.
   inline std::vector<double> jonswap_spectrum(
       const std::vector<double> &freqs,
       double fp, double alpha, double gamma_val)
@@ -54,7 +52,6 @@ namespace jonswap_detail
     return S;
   }
 
-  // Direction spread (degrees) per frequency, scaled by a conditions factor.
   inline std::vector<double> direction_spreads(
       const std::vector<double> &freqs,
       double conditions_factor)
@@ -74,7 +71,6 @@ namespace jonswap_detail
     return out;
   }
 
-  // Rejection-sample a cosine-power distribution over [-π/2, π/2].
   template <typename RNG>
   inline double cosine_deviation_deg(double spread_deg, RNG &rng)
   {
@@ -161,15 +157,14 @@ inline double direction_spread_factor(JonswapConditions c)
 
 struct Wave
 {
-  double amplitude;    // metres
-  double wavelength;   // metres
-  double angular_freq; // rad/s  — √(g · k), deep-water dispersion
-  double phase;        // rad,   random offset
-  double dir_x;        // unit direction vector x
-  double dir_y;        // unit direction vector y
+  double amplitude;
+  double wavelength;
+  double angular_freq;
+  double phase;
+  double dir_x;
+  double dir_y;
 };
 
-// dominant_dir_x/y: dominant wave propagation direction
 inline std::vector<Wave> generate_waves(
     JonswapConditions conditions,
     double dominant_dir_x = -1.0,
@@ -179,7 +174,6 @@ inline std::vector<Wave> generate_waves(
 {
   using namespace jonswap_detail;
 
-  // Normalise dominant direction
   double len = std::sqrt(dominant_dir_x * dominant_dir_x + dominant_dir_y * dominant_dir_y);
   if (len < 1e-6)
     throw std::invalid_argument("dominant direction vector cannot be zero");
@@ -187,23 +181,18 @@ inline std::vector<Wave> generate_waves(
   dominant_dir_y /= len;
   double dominant_angle_deg = std::atan2(dominant_dir_y, dominant_dir_x) * 180.0 / static_cast<double>(M_PI);
 
-  // Frequency grid (log-spaced, matching Python)
   auto freqs = logspace(LOWEST_WAVE_FREQ_HZ, HIGHEST_WAVE_FREQ_HZ, n_waves);
 
-  // Spectral density
   auto S = jonswap_spectrum(freqs, (double)peak_frequency(conditions),
                             (double)alpha(conditions), (double)gamma_factor(conditions));
 
-  // df (forward difference, last bin repeated)
   std::vector<double> df(n_waves);
   for (int i = 0; i < n_waves - 1; ++i)
     df[i] = freqs[i + 1] - freqs[i];
   df[n_waves - 1] = df[n_waves - 2];
 
-  // Directional spreads
   auto spreads = direction_spreads(freqs, direction_spread_factor(conditions));
 
-  // RNG
   std::mt19937 rng(seed);
   std::uniform_real_distribution<double> phase_dist(0.0, TWO_PI);
 
@@ -212,9 +201,9 @@ inline std::vector<Wave> generate_waves(
   {
     double f = freqs[i];
     double amplitude = std::sqrt(2.0 * S[i] * df[i]);
-    double wavelength = G / (TWO_PI * f * f); // deep-water: λ = g / (2π f²)
+    double wavelength = G / (TWO_PI * f * f);
     double k = TWO_PI / wavelength;
-    double ang_freq = std::sqrt(G * k); // ω = √(gk)
+    double ang_freq = std::sqrt(G * k);
     double phase = phase_dist(rng);
     double dev_deg = cosine_deviation_deg(spreads[i], rng);
     double dir_deg = dev_deg + dominant_angle_deg;
@@ -242,7 +231,6 @@ inline std::vector<Wave> generate_waves(
   return waves;
 }
 
-// A * sin(2π · (d⃗·[x,y] / λ) − ω·t + ϕ)
 inline double height_at(const std::vector<Wave> &waves, double x, double y, double t)
 {
   double total = 0.0;
