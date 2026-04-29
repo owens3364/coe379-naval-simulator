@@ -2,6 +2,7 @@ import capytaine as cpt
 import json
 import numpy as np
 import xarray as xr
+import trimesh
 from series_60_offsets import STATIONS, MAX_STATION, WATERLINES, MAX_WATERLINE, CB_VALUES, OFFSETS
 
 # TODO: dofs and center of rotation and mass and such should be appropriately defined(?)
@@ -40,6 +41,7 @@ def make_serializable(obj):
 # get cb value and offsets
 
 cb = float(input("Enter the Cb value to use: "))
+export_mesh = input("Export mesh? (y/N): ").lower() == "y"
 
 if cb not in CB_VALUES:
     print("This Cb value is unavailable.")
@@ -101,6 +103,14 @@ for i in [0, num_stations-1]:
 # capytaine computations
 
 mesh = cpt.Mesh(vertices=np.array(mesh_points), faces=np.array(faces))
+
+if export_mesh:
+    tri_faces = []
+    for face in faces:
+        tri_faces.append([face[0], face[1], face[2]])
+        tri_faces.append([face[0], face[2], face[3]])
+    trimesh.Trimesh(vertices=mesh.vertices, faces=np.array(tri_faces)).export("mesh.obj")
+
 body = cpt.FloatingBody( # we may need more parameters
     mesh=mesh,
     center_of_mass=(L/2, 0.0, -T/2) # TODO: check
@@ -155,4 +165,4 @@ output = {
 }
 
 with open("output.json", "w") as f:
-    json.dump(make_serializable(output), f)
+    json.dump(make_serializable(output), f, indent=2)
