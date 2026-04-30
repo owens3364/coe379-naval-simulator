@@ -172,6 +172,11 @@ B_roll_extra = 0.1 * 2 * np.sqrt(
     dataset['hydrostatic_stiffness'].sel(influenced_dof='Roll', radiating_dof='Roll').values *
     body.inertia_matrix[3, 3]
 )
+B_pitch_extra = 0.1 * 2 * np.sqrt(
+    dataset['hydrostatic_stiffness'].sel(influenced_dof='Pitch', radiating_dof='Pitch').values *
+    body.inertia_matrix[4, 4]
+)
+dataset['radiation_damping'].loc[dict(radiating_dof='Pitch', influenced_dof='Pitch')] += B_pitch_extra
 dataset['radiation_damping'].loc[dict(radiating_dof='Roll', influenced_dof='Roll')] += B_roll_extra
 RAO = rao(dataset)
 

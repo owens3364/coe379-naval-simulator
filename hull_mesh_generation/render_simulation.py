@@ -67,13 +67,7 @@ def transform_boat(verts_rest: NDArray, motion_row: NDArray) -> NDArray:
   R = rotation_matrix(roll, pitch, yaw)
   center = verts_rest.mean(axis=0)
   verts = (verts_rest - center) @ R.T + center
-  verts += np.array([surge, sway, heave + 5.0])
-  dominant_angle = np.arctan2(-1, -1)  # = -3π/4
-  cos_a, sin_a = np.cos(dominant_angle), np.sin(dominant_angle)
-  R_align = np.array([[cos_a, -sin_a, 0],
-                      [sin_a,  cos_a, 0],
-                      [0,      0,     1]], dtype=np.float32)
-  boat_verts_rest = boat_verts_rest @ R_align.T
+  verts += np.array([surge, sway, heave + 10.0])
   return verts.astype(np.float32)
 
 def main(ocean_path: str, motion_path: str, obj_path: str) -> None:
@@ -89,6 +83,12 @@ def main(ocean_path: str, motion_path: str, obj_path: str) -> None:
   boat_mesh = trimesh.load(obj_path)
   boat_verts_rest = np.array(boat_mesh.vertices, dtype=np.float32)
   boat_verts_rest -= boat_verts_rest.mean(axis=0)
+  dominant_angle = np.arctan2(-1, -1)  # = -3π/4
+  cos_a, sin_a = np.cos(dominant_angle), np.sin(dominant_angle)
+  R_align = np.array([[cos_a, -sin_a, 0],
+                      [sin_a,  cos_a, 0],
+                      [0,      0,     1]], dtype=np.float32)
+  boat_verts_rest = boat_verts_rest @ R_align.T
   boat_faces      = np.array(boat_mesh.faces,    dtype=np.int32)
   print(f"Boat mesh: {len(boat_verts_rest)} verts, {len(boat_faces)} faces")
 
