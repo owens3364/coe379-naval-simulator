@@ -1,9 +1,10 @@
 import capytaine as cpt
+from capytaine.post_pro import rao
 import json
 import numpy as np
 import xarray as xr
 import trimesh
-from series_60_offsets import STATIONS, MAX_STATION, WATERLINES, MAX_WATERLINE, CB_VALUES, OFFSETS
+from series_60_offsets import STATIONS, MAX_STATION, WATERLINES, CB_VALUES, OFFSETS
 
 # TODO: dofs and center of rotation and mass and such should be appropriately defined(?)
 
@@ -24,14 +25,22 @@ def make_serializable(obj):
     elif isinstance(obj, (list, tuple)):
         return [make_serializable(v) for v in obj]
     elif isinstance(obj, np.ndarray):
+        if np.iscomplexobj(obj):
+            return {"real": obj.real.tolist(), "imag": obj.imag.tolist()}
         return obj.tolist()
     elif isinstance(obj, xr.DataArray):
+        vals = obj.values
+        data = {"real": vals.real.tolist(), "imag": vals.imag.tolist()} if np.iscomplexobj(vals) else vals.tolist()
         return {
-            "data": obj.values.tolist(),
+            "data": data,
             "dims": obj.dims,
             "coords": {k: make_serializable(v.values) for k, v in obj.coords.items()},
             "name": obj.name
         }
+    elif isinstance(obj, xr.Dataset):
+        return {var: make_serializable(obj[var]) for var in obj.data_vars}
+    elif isinstance(obj, complex):
+        return {"real": obj.real, "imag": obj.imag}
     else:
         try:
             return obj.item()
@@ -100,6 +109,14 @@ for i in [0, num_stations-1]:
         v4 = vertex_idx(i, num_waterlines, j, True)
         faces.append([v1, v2, v3, v4])
 
+wave_spec_filepath = input('Enter the filepath of wave specifications that you would like to run the BEM solver for')
+waves = []
+with open(wave_spec_filepath) as f:
+    n = int(f.readline())
+    for _ in range(n):
+        waves.append(list(map(float, f.readline().split())))
+
+
 # capytaine computations
 
 mesh = cpt.Mesh(vertices=np.array(mesh_points), faces=np.array(faces))
@@ -124,44 +141,34 @@ print("\nGenerated Hydrostatic Coefficients")
 for k, v in hydrostatics.items():
     print(f"{k}: {v}")
 
-added_masses = []
-radiation_dampings = []
+frequencies = np.logspace(np.log10(0.05), np.log10(2.0), 50)
+omega_vals = 2 * np.pi * frequencies
 
-# om = np.linspace(0.2, 2.0, 10)
-om = [1.0] # TODO: replace all this stuff with JONSWAP wave spectra
+wave_directions = list(set(
+    np.degrees(np.arctan2(w[5], w[4])) * np.pi / 180
+    for w in waves
+))
+
+test_matrix = xr.Dataset(coords={
+    'omega': omega_vals,
+    'wave_direction': wave_directions,
+    'radiating_dof': list(body.dofs.keys()),
+    'rho': 1025.0,
+    'water_depth': np.inf,
+})
+
+body.inertia_matrix = body.compute_rigid_body_inertia(rho=500.0)  # kg/m3
+body.hydrostatic_stiffness = body.compute_hydrostatic_stiffness()
 
 solver = cpt.BEMSolver()
-for o in om:
-    added_masses.append([])
-    radiation_dampings.append([])
-    for dof in body.dofs:
-        rp = cpt.RadiationProblem(body=body, omega=o, radiating_dof=dof) # TODO: specify radiating dof
-        res = solver.solve(rp)
-        added_masses[-1].append(res.added_mass)
-        radiation_dampings[-1].append(res.radiation_damping)
-
-print(added_masses)
-print(radiation_dampings)
-
-# dump
+dataset = solver.fill_dataset(test_matrix, body, hydrostatics=True)
+RAO = rao(dataset)
 
 output = {
-    "params": {
-        "L": L,
-        "B": B,
-        "T": T,
-        "Cb": cb
-    },
+    "params": {"L": L, "B": B, "T": T, "Cb": cb},
     "hydrostatic_coeffs": hydrostatics,
-    "dofs": body.dofs,
-    "radiation_data": [
-        {
-            "omega": o,
-            "added_masses": added_masses[i],
-            "radiation_dampings": radiation_dampings[i]
-        }
-        for i, o in enumerate(om)
-    ]
+    "dofs": list(body.dofs.keys()),
+    "rao": make_serializable(RAO),
 }
 
 with open("output.json", "w") as f:
