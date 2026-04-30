@@ -6,8 +6,6 @@ import xarray as xr
 import trimesh
 from series_60_offsets import STATIONS, MAX_STATION, WATERLINES, CB_VALUES, OFFSETS
 
-# TODO: dofs and center of rotation and mass and such should be appropriately defined(?)
-
 # constants
 
 L = 100.0 # length (m)
@@ -77,8 +75,6 @@ for station_idx, x in enumerate(x_coords):
         mesh_points.append([x, y, z])
         mesh_points.append([x, -y, z])
 
-# build mesh TODO: interpolation for finer mesh
-
 # mesh points are vertices
 faces = []
 
@@ -136,7 +132,7 @@ if export_mesh:
 
 body = cpt.FloatingBody( # we may need more parameters
     mesh=mesh,
-    center_of_mass=(L/2, 0.0, -T/2) # TODO: check
+    center_of_mass=(L/2, 0.0, -T/2)
 )
 body.add_all_rigid_body_dofs()
 
@@ -168,6 +164,16 @@ body.hydrostatic_stiffness = body.compute_hydrostatic_stiffness()
 
 solver = cpt.BEMSolver()
 dataset = solver.fill_dataset(test_matrix, body, hydrostatics=True)
+B_roll_extra = 0.1 * 2 * np.sqrt(
+    dataset['hydrostatic_stiffness'].sel(influenced_dof='Roll', radiating_dof='Roll').values *
+    body.inertia_matrix[3, 3]
+)
+B_pitch_extra = 0.1 * 2 * np.sqrt(
+    dataset['hydrostatic_stiffness'].sel(influenced_dof='Pitch', radiating_dof='Pitch').values *
+    body.inertia_matrix[4, 4]
+)
+dataset['radiation_damping'].loc[dict(radiating_dof='Pitch', influenced_dof='Pitch')] += B_pitch_extra
+dataset['radiation_damping'].loc[dict(radiating_dof='Roll', influenced_dof='Roll')] += B_roll_extra
 RAO = rao(dataset)
 
 output = {

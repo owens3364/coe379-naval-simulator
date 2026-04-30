@@ -1,12 +1,31 @@
 #include <mpi.h>
 #include <chrono>
+#include <cstdint>
 #include <cstdio>
 #include <vector>
 #include "jonswap.hpp"
 
-static constexpr int GRID = 1000;
+static constexpr int GRID = 500;
+static constexpr float FPS = 20.0f;
+static constexpr float T_END = 60.0f;
+static constexpr int N_FRAMES = (int)(T_END * FPS);
+static constexpr float DT = 1.0f / FPS;
 static constexpr double EXTENT = 50.0;
 static constexpr double T = 0.0;
+
+struct FileHeader
+{
+  uint32_t magic;
+  uint32_t version;
+  uint32_t rows;
+  uint32_t cols;
+  uint32_t n_frames;
+  float fps;
+  float extent;
+  uint8_t padding[36];
+};
+static constexpr MPI_Offset HEADER_SIZE = 64;
+static constexpr MPI_Offset FRAME_SIZE = sizeof(float) * GRID * GRID + sizeof(float);
 
 static void build_coords(
     int row_start, int row_end,
@@ -86,52 +105,73 @@ static void run_mpi(int rank, int nprocs, const std::vector<Wave> &waves)
     wave_buf = pack_waves(waves);
   else
     wave_buf.resize(n_waves * WAVE_DOUBLES);
-
   MPI_Bcast(wave_buf.data(), (int)wave_buf.size(), MPI_DOUBLE, 0, MPI_COMM_WORLD);
-
   std::vector<Wave> local_waves = unpack_waves(wave_buf);
 
   int rows_per_rank = GRID / nprocs;
   int remainder = GRID % nprocs;
-
   int my_row_start = rank * rows_per_rank;
   int my_row_end = my_row_start + rows_per_rank + (rank == nprocs - 1 ? remainder : 0);
   int my_rows = my_row_end - my_row_start;
 
+  MPI_File fh;
+  MPI_File_open(MPI_COMM_WORLD, "ocean.bin",
+                MPI_MODE_CREATE | MPI_MODE_WRONLY,
+                MPI_INFO_NULL, &fh);
+
+  if (rank == 0)
+  {
+    FileHeader hdr = {};
+    hdr.magic = 0x4E45434F;
+    hdr.version = 1;
+    hdr.rows = GRID;
+    hdr.cols = GRID;
+    hdr.n_frames = N_FRAMES;
+    hdr.fps = FPS;
+    hdr.extent = (float)EXTENT;
+    MPI_File_write_at(fh, 0, &hdr, sizeof(FileHeader), MPI_BYTE, MPI_STATUS_IGNORE);
+    printf("[MPI x%d] Writing %d frames at %.0ffps, %dx%d grid → ocean.bin\n",
+           nprocs, N_FRAMES, FPS, GRID, GRID);
+  }
+
+  MPI_Offset my_heights_offset_in_frame = sizeof(float) + my_row_start * GRID * sizeof(float);
+
+  std::vector<float> local_Z(my_rows * GRID);
   std::vector<double> xs, ys;
   build_coords(my_row_start, my_row_end, xs, ys);
 
   MPI_Barrier(MPI_COMM_WORLD);
   double t0 = MPI_Wtime();
 
-  std::vector<double> local_Z = height_grid(local_waves, xs, ys, (double)T);
+  for (int frame = 0; frame < N_FRAMES; ++frame)
+  {
+    double t = frame * DT;
+
+    std::vector<double> local_Zd = height_grid(local_waves, xs, ys, t);
+    for (int i = 0; i < (int)local_Zd.size(); ++i)
+      local_Z[i] = (float)local_Zd[i];
+
+    MPI_Offset frame_start = HEADER_SIZE + frame * FRAME_SIZE;
+
+    if (rank == 0)
+    {
+      float ts = (float)t;
+      MPI_File_write_at(fh, frame_start, &ts, 1, MPI_FLOAT, MPI_STATUS_IGNORE);
+    }
+
+    MPI_Offset offset = frame_start + my_heights_offset_in_frame;
+    MPI_File_write_at(fh, offset,
+                      local_Z.data(), (int)local_Z.size(),
+                      MPI_FLOAT, MPI_STATUS_IGNORE);
+  }
 
   MPI_Barrier(MPI_COMM_WORLD);
   double t1 = MPI_Wtime();
 
-  std::vector<int> recv_counts(nprocs), displs(nprocs);
-  for (int r = 0; r < nprocs; ++r)
-  {
-    int r_start = r * rows_per_rank;
-    int r_rows = rows_per_rank + (r == nprocs - 1 ? remainder : 0);
-    recv_counts[r] = r_rows * GRID;
-    displs[r] = r_start * GRID;
-  }
-
-  std::vector<double> Z;
-  if (rank == 0)
-    Z.resize(GRID * GRID);
-
-  MPI_Gatherv(local_Z.data(), (int)local_Z.size(), MPI_DOUBLE,
-              Z.data(), recv_counts.data(), displs.data(), MPI_DOUBLE,
-              0, MPI_COMM_WORLD);
+  MPI_File_close(&fh);
 
   if (rank == 0)
-  {
-    double ms = (t1 - t0) * 1000.0;
-    printf("[MPI x%d] %dx%d grid, %zu waves → %.2f ms\n",
-           nprocs, GRID, GRID, local_waves.size(), ms);
-  }
+    printf("Done in %.2f ms\n", (t1 - t0) * 1000.0);
 }
 
 int main(int argc, char **argv)
