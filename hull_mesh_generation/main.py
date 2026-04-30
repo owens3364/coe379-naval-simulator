@@ -41,6 +41,12 @@ def make_serializable(obj):
         return {var: make_serializable(obj[var]) for var in obj.data_vars}
     elif isinstance(obj, complex):
         return {"real": obj.real, "imag": obj.imag}
+    elif isinstance(obj, float):
+        if np.isinf(obj):
+            return "Infinity" if obj > 0 else "-Infinity"
+        elif np.isnan(obj):
+            return None
+        return obj
     else:
         try:
             return obj.item()
@@ -109,7 +115,7 @@ for i in [0, num_stations-1]:
         v4 = vertex_idx(i, num_waterlines, j, True)
         faces.append([v1, v2, v3, v4])
 
-wave_spec_filepath = input('Enter the filepath of wave specifications that you would like to run the BEM solver for')
+wave_spec_filepath = input('Enter the filepath of wave specifications that you would like to run the BEM solver for: ')
 waves = []
 with open(wave_spec_filepath) as f:
     n = int(f.readline())

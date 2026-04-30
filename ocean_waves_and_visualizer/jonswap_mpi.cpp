@@ -145,9 +145,29 @@ int main(int argc, char **argv)
   std::vector<Wave> waves;
   if (rank == 0)
   {
-    waves = generate_waves(JonswapConditions::STORMY, -1.0, -1.0, NUM_WAVES, 420u);
-    printf("Generated %zu waves\n", waves.size());
+    if (argc < 2)
+    {
+      fprintf(stderr, "Usage: %s <waves.txt>\n", argv[0]);
+      MPI_Abort(MPI_COMM_WORLD, 1);
+    }
 
+    FILE *f = fopen(argv[1], "r");
+    if (!f)
+    {
+      fprintf(stderr, "Failed to open %s\n", argv[1]);
+      MPI_Abort(MPI_COMM_WORLD, 1);
+    }
+
+    int n;
+    fscanf(f, "%d", &n);
+    waves.resize(n);
+    for (auto &w : waves)
+      fscanf(f, "%lf %lf %lf %lf %lf %lf",
+             &w.amplitude, &w.wavelength, &w.angular_freq,
+             &w.phase, &w.dir_x, &w.dir_y);
+    fclose(f);
+
+    printf("Loaded %zu waves from %s\n", waves.size(), argv[1]);
     run_serial(waves);
   }
 
