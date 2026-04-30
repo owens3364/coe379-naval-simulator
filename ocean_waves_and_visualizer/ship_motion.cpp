@@ -118,7 +118,7 @@ static void compute_motion(
     motion[k] = 0.0;
 
   omp_set_num_threads(n_threads);
-#pragma omp parallel for reduction(+ : motion[ : 6]) schedule(static)
+#pragma omp parallel for reduction(+ : motion[ : 6]) schedule(guide)
   for (int n = 0; n < (int)waves.size(); ++n)
   {
     double phase_total = waves[n].angular_freq * t + waves[n].phase;

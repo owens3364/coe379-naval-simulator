@@ -4,9 +4,11 @@ This directory contains code which can be used to mathematically simulate ocean 
 
 ## Contents
 
+- `gen_waves.cpp` generates a file named `waves.txt` that lists the number of waves and the JONSWAP-derived wave properties (amplitude, wavelength, angular frequency, phase shift, direction x/y) for each of them, separated by newlines.
+- `jonswap_mpi.cpp` parallelizes the ocean surface computation with MPI and generates `ocean.bin` which is a binary file with a 64-byte header that contains the number of rows, cols, frames, fps, and grid dims (meters) and its body is each ocean heights matrix written directly into the file as f32s.
 - `jonswap_py.cpp` provides C++ bindings so `jonswap.hpp` can be used by the Python visualizer.
-- `visualizer.py` visualizes a single rendering of the ocean using those bindings and `jonswap.hpp`.
 - `jonswap.hpp` is a single header file that provides realistic ocean surface simulations using sampling from the JONSWAP spectrum.
+- `visualizer.py` visualizes a single rendering of the ocean using those bindings and `jonswap.hpp`.
 
 ## Compiling and Running
 
