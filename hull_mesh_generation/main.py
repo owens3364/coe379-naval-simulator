@@ -168,6 +168,11 @@ body.hydrostatic_stiffness = body.compute_hydrostatic_stiffness()
 
 solver = cpt.BEMSolver()
 dataset = solver.fill_dataset(test_matrix, body, hydrostatics=True)
+B_roll_extra = 0.1 * 2 * np.sqrt(
+    dataset['hydrostatic_stiffness'].sel(influenced_dof='Roll', radiating_dof='Roll').values *
+    body.inertia_matrix[3, 3]
+)
+dataset['radiation_damping'].loc[dict(radiating_dof='Roll', influenced_dof='Roll')] += B_roll_extra
 RAO = rao(dataset)
 
 output = {
