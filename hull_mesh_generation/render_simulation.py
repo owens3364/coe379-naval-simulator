@@ -1,16 +1,3 @@
-"""
-Renderer for precomputed ocean simulation data.
-
-Usage:
-    python render_simulation.py ocean.bin boat_motion.txt mesh.obj
-
-Controls:
-    Space       pause / resume
-    Left/Right  step one frame
-    R           reset to frame 0
-    Mouse       rotate / zoom (turntable camera)
-"""
-
 import sys
 import struct
 import numpy as np

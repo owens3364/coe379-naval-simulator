@@ -2,9 +2,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 import jonswap_py as jp
 
-GRID   = 1000   # grid resolution
-EXTENT = 50   # metres each side
-T      = 0.0   # time snapshot
+GRID = 1000
+EXTENT = 50
+T = 0.0
 
 min_wavelength = (2 * EXTENT) / (GRID / 2)
 waves = jp.generate_waves(jp.JonswapConditions.STORMY)
