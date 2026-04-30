@@ -11,4 +11,8 @@ target_include_directories(jonswap_mpi PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
 target_link_libraries(jonswap_mpi PRIVATE MPI::MPI_CXX m)
 
+target_link_libraries(gen_waves PRIVATE m)
+
 target_compile_options(jonswap_mpi PRIVATE -O2 -std=c++17)
+
+target_compile_options(gen_waves PRIVATE -O2 -std=c++17)
