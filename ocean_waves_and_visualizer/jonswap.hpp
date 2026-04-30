@@ -4,7 +4,6 @@
 #include <cassert>
 #include <cmath>
 #include <cstdint>
-#include <iostream>
 #include <random>
 #include <stdexcept>
 #include <vector>
@@ -38,16 +37,6 @@ namespace jonswap_detail
       double r = std::exp(-((f - fp) * (f - fp)) / (2.0 * sig * sig * fp * fp));
       S[i] = static_cast<double>(
           alpha * G * G * std::pow(f, -5.0) * std::pow(TWO_PI, -4.0) * std::exp(-1.25 * std::pow(fp / f, 4.0)) * std::pow(gamma_val, r));
-      if (i == 0)
-      {
-        printf("f=%e\n", f);
-        printf("alpha*G*G=%e\n", alpha * G * G);
-        printf("pow(f,-5)=%e\n", std::pow(f, -5.0));
-        printf("pow(TWO_PI,-4)=%e\n", std::pow(TWO_PI, -4.0));
-        printf("exp term=%e\n", std::exp(-1.25 * std::pow(fp / f, 4.0)));
-        printf("gamma^r=%e\n", std::pow(gamma_val, r));
-        printf("r=%e\n", r);
-      }
     }
     return S;
   }
@@ -217,16 +206,6 @@ inline std::vector<Wave> generate_waves(
         std::cos(dir_rad),
         std::sin(dir_rad),
     };
-    std::cout << "MAGNITUDE" << "\n";
-    std::cout << amplitude << "\n";
-    std::cout << "WAVELENGTH" << "\n";
-    std::cout << wavelength << "\n";
-    std::cout << "DIRECTION" << "\n";
-    std::cout << "[" << std::cos(dir_rad) << ", " << std::sin(dir_rad) << "]" << "\n";
-    std::cout << "ANGULAR FREQUENCY" << "\n";
-    std::cout << ang_freq << "\n";
-    std::cout << "PHASE SHIFT" << "\n";
-    std::cout << phase << "\n";
   }
   return waves;
 }
