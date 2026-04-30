@@ -8,6 +8,7 @@ This directory contains code which can be used to mathematically simulate ocean 
 - `jonswap_mpi.cpp` parallelizes the ocean surface computation with MPI and generates `ocean.bin` which is a binary file with a 64-byte header that contains the number of rows, cols, frames, fps, and grid dims (meters) and its body is each ocean heights matrix written directly into the file as f32s.
 - `jonswap_py.cpp` provides C++ bindings so `jonswap.hpp` can be used by the Python visualizer.
 - `jonswap.hpp` is a single header file that provides realistic ocean surface simulations using sampling from the JONSWAP spectrum.
+- `ship_motion.cpp` simulates the boat motion and outputs a `boat_motion.txt` which can be fed (alongside ocean.bin) into the [render_simulation](../hull_mesh_generation/render_simulation.py) python script.
 - `visualizer.py` visualizes a single rendering of the ocean using those bindings and `jonswap.hpp`.
 
 ## Compiling and Running
