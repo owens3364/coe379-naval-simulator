@@ -111,34 +111,41 @@ static void compute_motion(
     const std::vector<Wave> &waves,
     const RaoTable &rao,
     double t,
-    double motion[6])
+    double motion[6],
+    int n_threads)
 {
   for (int k = 0; k < 6; ++k)
     motion[k] = 0.0;
 
+  omp_set_num_threads(n_threads);
 #pragma omp parallel for reduction(+ : motion[ : 6]) schedule(static)
   for (int n = 0; n < (int)waves.size(); ++n)
   {
     double phase_total = waves[n].angular_freq * t + waves[n].phase;
     for (int k = 0; k < 6; ++k)
-    {
       motion[k] += waves[n].amplitude * rao.mag[k][n] * std::cos(phase_total + rao.phase[k][n]);
-    }
   }
 }
 
 int main(int argc, char **argv)
 {
-  if (argc < 3)
+  if (argc < 4)
   {
-    fprintf(stderr, "Usage: %s <waves.txt> <output.json>\n", argv[0]);
+    fprintf(stderr, "Usage: %s <waves.txt> <output.json> <n_threads>\n", argv[0]);
+    return 1;
+  }
+
+  int n_threads = std::atoi(argv[3]);
+  if (n_threads < 1)
+  {
+    fprintf(stderr, "n_threads must be >= 1\n");
     return 1;
   }
 
   auto waves = load_waves(argv[1]);
   printf("Loaded %zu waves\n", waves.size());
 
-  printf("Loading RAO from %s (this may take a moment for large JSON)...\n", argv[2]);
+  printf("Loading RAO from %s...\n", argv[2]);
   auto rao = load_rao(argv[2], waves);
   printf("RAO table built\n");
 
@@ -146,33 +153,35 @@ int main(int argc, char **argv)
   double t_end = 60.0;
   int n_steps = (int)(t_end / dt);
 
-  printf("\nSimulating %.1fs of ship motion (dt=%.3fs, %d steps)\n\n",
-         t_end, dt, n_steps);
-  printf("%-10s %-12s %-12s %-12s %-12s %-12s %-12s\n",
-         "t(s)", "Surge(m)", "Sway(m)", "Heave(m)",
-         "Roll(rad)", "Pitch(rad)", "Yaw(rad)");
-  printf("%-10s %-12s %-12s %-12s %-12s %-12s %-12s\n",
-         "----------", "------------", "------------", "------------",
-         "------------", "------------", "------------");
+  FILE *out = fopen("boat_motion.txt", "w");
+  if (!out)
+  {
+    fprintf(stderr, "Failed to open boat_motion.txt\n");
+    return 1;
+  }
+  fprintf(out, "t surge sway heave roll pitch yaw\n");
+
+  printf("Simulating %.1fs, dt=%.3fs, %d steps, %d thread(s) → boat_motion.txt\n",
+         t_end, dt, n_steps, n_threads);
 
   auto wall_start = std::chrono::high_resolution_clock::now();
 
-  for (int step = 0; step <= n_steps; step += 10)
+  for (int step = 0; step <= n_steps; ++step)
   {
     double t = step * dt;
     double motion[6];
-    compute_motion(waves, rao, t, motion);
-
-    printf("%-10.2f %-12.4f %-12.4f %-12.4f %-12.4f %-12.4f %-12.4f\n",
-           t,
-           motion[SURGE], motion[SWAY], motion[HEAVE],
-           motion[ROLL], motion[PITCH], motion[YAW]);
+    compute_motion(waves, rao, t, motion, n_threads);
+    fprintf(out, "%.4f %.6f %.6f %.6f %.6f %.6f %.6f\n",
+            t,
+            motion[SURGE], motion[SWAY], motion[HEAVE],
+            motion[ROLL], motion[PITCH], motion[YAW]);
   }
+
+  fclose(out);
 
   auto wall_end = std::chrono::high_resolution_clock::now();
   double ms = std::chrono::duration<double, std::milli>(wall_end - wall_start).count();
-  printf("\nSimulated %d steps in %.2f ms (%.3f ms/step)\n",
-         n_steps, ms, ms / n_steps);
+  printf("Done. %d steps in %.2f ms (%.3f ms/step)\n", n_steps, ms, ms / n_steps);
 
   return 0;
 }
